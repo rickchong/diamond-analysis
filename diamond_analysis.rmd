@@ -1,28 +1,28 @@
 ---
-title: "Chong.Rick_Final"
+title: "Diamond price analysis"
 author: "Rick Chong"
 date: "February 12, 2018"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+    keep_md: true
+  pdf_document: default
 ---
 #Introduction
-In this report, I will be analyzing the diamond data from two major online retailers - Bluenile.com and BrilliantEarth.com. I got the inspiration based on my recent shopping experience as well as various analysis that had already been performed by others either using the existing diamonds database or manually scraped online (e.g. https://rstudio-pubs-static.s3.amazonaws.com/94067_d1fdfafd20b14725a2578647031760c2.html).
+In this analysis, I will be analyzing the diamond data from two major online retailers - bluenile.com and brilliantearth.com. I got the inspiration based on my recent shopping experience as well as various analysis that had already been performed by others either using the existing databases or manually scraped data (e.g. https://rstudio-pubs-static.s3.amazonaws.com/94067_d1fdfafd20b14725a2578647031760c2.html).
 
 ##Difference between my analysis and other analysis online
-This report is different from the rest available online because:
+This analysis is different from most of the analysis available online because:
 
-* All analysis I found online are only performed on either existing R diamonds database or bluenile.com. I am more comparing price differences between two companies rather than one. 
-* Besides prices, I am also interested to analyze whether there is any difference in retail strategy between two companies using some knowledge I learned from Retail Analytics
+* All analysis I found online are performed on either existing R diamonds database or bluenile.com. I am interested in comparing price differences between two retailers rather than one. 
+* Besides prices, I am also interested in analyzing whether there is any difference in retail strategy or marketing strategy between two retailers. 
 
 #Overview
-This report is split into 5 sections:
+This analysis is split into 4 parts:
 
-* Data gathering: gather data from Bluenile.com and BrilliantEarth.com
+* Data gathering: gather data from bluenile.com and brilliantearth.com
 * Data cleanup: clean up the data and combine two data sources together
 * Data analysis: specific analysis performed on the combined data
-* Shiny frontend: creating a frontend using Shiny
 * Conclusion: key learning points and takeaways
 
 #Loading all packages
@@ -42,12 +42,12 @@ opts_chunk$set(comment = "", warning = FALSE, message = FALSE, echo = TRUE, tidy
 ```
 
 \newpage
-#Data gathering
+#Part 1: Data gathering
 ##Getting data from bluenile.com
 
 ```{r, tidy=TRUE}
 #Download data from bluenile.com
-# Below is the url to send a request to bluenile.com and receive a json datadump. As bluenile.com restricts the data to 1000 per request, I create an iteration of request using min and max price, with $100 incremental step. As of the day of data download, BlueNile has 120K diamonds. So, the population downloaded is fairly complete.
+# Below is the url to send a request to bluenile.com and receive a json data. As bluenile.com restricts the data to 1000 diamonds per request, I create an iteration of request using min and max price, with $100 incremental step. As of the day of data download, bluenile.com has 120K diamonds for round diamond. So, the population downloaded is fairly complete.
 bluenileUrl<-'https://www.bluenile.com/api/public/diamond-search-grid/v2?country=USA&language=en-us&currency=USD&startIndex=0&pageSize=1000&shape=RD&sortColumn=price&sortDirection=asc&maxCarat=5'
 
 a = ''
@@ -59,7 +59,7 @@ for (i in 1:497){
   b[i] <- 300+i*100
 }
 #The code below will iterate and pull data from bluenile.com. I comment this 
-#portion out to avoid downloading the data again from bluenile when knit
+#portion out to avoid downloading the datafrom bluenile again accidentally
 # for (i in 1:497){
 #   iterateDownload<- fromJSON(paste0(bluenileUrl,'&minPrice=',a[i],"&maxPrice=",b[i]),simplifyDataFrame=TRUE)$results
 #   bluenileDownload <- rbind(bluenileDownload, bluenileIterateDownload)
@@ -71,31 +71,30 @@ glimpse(bluenileDownload)
 ```
 
 
-##Getting data from BrilliantEarth.com
+##Getting data from brilliantearth.com
 
 ```{r, tidy=TRUE}
-#Using simlar concept, I download the data from BrilliantEarth.com
+#Using simlar concept, I download the data from brilliantearth.com
+#I comment most of the codes to avoid sending unnecessary request
 brilliantUrl1<-'https://www.brilliantearth.com/loose-diamonds/list/?shapes=Round&cuts=Fair%2CGood%2CVery+Good%2CIdeal%2CSuper+Ideal&colors=J%2CI%2CH%2CG%2CF%2CE%2CD&clarities=SI2%2CSI1%2CVS2%2CVS1%2CVVS2%2CVVS1%2CIF%2CFL&polishes=Good%2CVery+Good%2CExcellent&symmetries=Good%2CVery+Good%2CExcellent&fluorescences=Very+Strong%2CStrong%2CMedium%2CFaint%2CNone&min_carat=0.25&max_carat=5.00&min_table=45.00&max_table=84.00&min_depth=34.50&max_depth=85.80&min_price=1&max_price=50000&stock_number=&row=0&page='
 brilliantUrl2 <-'&requestedDataSize=1000&order_by=price&order_method=asc&currency=%24&has_v360_video=&min_ratio=1.00&max_ratio=2.75&shipping_day=&MIN_PRICE=570&MAX_PRICE=1216420&MIN_CARAT=0.25&MAX_CARAT=25.25&MIN_TABLE=45&MAX_TABLE=84&MIN_DEPTH=34.5&MAX_DEPTH=85.8'
 
 brilliantPage = c(1:22)
 
 #While I iterate through the download, I realize that sometimes the column
-#number are inconsistent as some data has image column. Therefore, I first
+#are inconsistent as some data has additional image column. Therefore, I first
 #create a single data pull in order to get a sample data and all the header name
-#I comment this out to avoid sending unnecessary request to BrilliantEarth
 # brilliantTempdownload = fromJSON(paste0(brilliantUrl1,brilliantPage[1],brilliantUrl2),simplifyDataFrame = TRUE)$diamonds
 
-#Then I specify the columns that I want by excluding all columns containing
-#image string. I comment this out to avoid data refreshing.
+#Then I specify the columns that I want by excluding all columns that contain
+#image string. 
 # brilliantDownload <- brilliantTempdownload %>%
 #   select(-contains('image'))
 
-#I run the iteration to pull the data and using intersect to select only the
+#I run the iteration to pull the data and use intersect to select only the
 #required columns. By doing so, I avoided the errors due to inconsistent columns
-#between different iterations. I comment out the code below to avoid running it
-#during knit. As of the day of download, BrilliantEarth has 21308 diamonds,
-#so the population is complete.
+#between different iterations. As of the day of download, brilliantearth.com has 
+#21308 diamonds, so the population is complete.
 
 # for (i in 2:22){
 #   brilliantIterateDownload<- fromJSON(paste0(brilliantUrl1,brilliantPage[i],brilliantUrl2),simplifyDataFrame = TRUE)$diamonds
@@ -107,14 +106,14 @@ brilliantPage = c(1:22)
 #   cat(i)
 # }
 
-#20K rows of data downloaded
+#21K rows of data downloaded
 glimpse(brilliantDownload)
 ```
 
-#Data cleaning and combination
+#Part 2: Data cleaning and combination
 
 ```{r, tidy=TRUE}
-#clean up bluenile data by defining the correct format
+#Define the correct format
 bluenileTempdata <- bluenileDownload %>%
   mutate(carat = as.numeric(carat)) %>%
   mutate(depth = as.numeric(carat)) %>%
@@ -145,7 +144,7 @@ combineDiamond <- rbind(bluenileTobemerge, brilliantTobemerge)%>%
   filter(clarity!='FL') %>%
   mutate(clarity = factor(clarity, levels=c("IF","VVS1","VVS2","VS1","VS2","SI1","SI2","I1"))) %>%
   
-# GIA is a independent gemological institute which grades diamond. In a
+# GIA is an independent gemological institute that grades diamond. In a
 # typical diamond grading for cut, there is nothing called "Astor Ideal" or
 # "Super Ideal", the maximum grading is "Ideal". "Astor Ideal" and "Super
 # Ideal" are recent trend in the diamond industry used by some retailers to
@@ -158,16 +157,16 @@ combineDiamond <- rbind(bluenileTobemerge, brilliantTobemerge)%>%
   mutate(color = factor(color, levels=c("D","E","F","G","H","I","J"))) %>% 
   mutate(source = factor(source, levels=c("brilliant","bluenile"))) %>%
   
-#I always heard that diamonds with exact integer (e.g. 1.00 carat) demands
-#greater price. So I create a dummy variable to be used for analysis
+# I always heard that diamonds with exact integer (e.g. 1.00 carat) demands
+# greater price. So I create a dummy variable to be used for analysis
 
   mutate(caratInteger = carat%%1 == 0)
 ```
 
 \newpage
-#Analysis
+#Part 3: Analysis
 ##Overall data
-I first validate the overall dataset by plotting a scatter plot. Here, we can see that diamond price increases with carat in a polynomial manner. We also see that as the features/rarities of the diamonds (i.e. color and clarity) increases, the price also increases. This conforms with the general trend of the diamond prices. However, there doesn't seem to have a distinct pattern for cut. 
+I first look at the overall dataset by plotting a scatter plot. Here, we can see that diamond price increases with carat in a polynomial manner. We also see that as the features/rarities of the diamonds (i.e. color and clarity) increase, the price also increases. This conforms with the general trend of the diamond prices. However, there doesn't seem to have a distinct pattern for cut. 
 
 ```{r, tidy=TRUE}
 ggplot(combineDiamond, aes(x = carat, y = price)) + geom_point(aes(
@@ -191,7 +190,7 @@ ggplot(combineDiamond, aes(x = carat, y = price)) + geom_point(aes(
 
 \newpage
 ##Inventory distribution by carat size
-I first look into the inventory distribution by carat. I see that while BrilliantEarth.com is ~5 times smaller in size than BlueNile.com, the inventory distribution is highly similar. For example, there are spikes in inventory for diamonds with carat=1, 1.5, 2. This potentially reflects the consumer's demand for these specific carats. 
+I create a histogram to analyze the inventory distribution by carat. I see that while the inventory size for brilliantearth.com is ~5 times smaller in size as compared to bluenile.com, the inventory distribution is almost similar. For example, there are spikes in inventory for diamonds with carat=1, 1.5, 2. This potentially reflects the consumer's demand for these specific carats. 
 
 ```{r, tidy=TRUE}
 ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05) + xlim(c(0,3)) + facet_wrap(~source, scales='free_y') + ggtitle("Inventory by carat")
@@ -199,7 +198,7 @@ ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05) + xlim(c(0,3)
 
 \newpage
 ##Inventory distribution by color
-I look into the distribution of the diamond's color. It appears that the proportion seems similar.
+I then create a similar histogram, but add visualization for distribution of diamond's color. The proportion seems similar.
 
 ```{r, tidy=TRUE}
 ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05, aes(fill=color)) + xlim(c(0,3)) + facet_wrap(~source, scales='free_y') + ggtitle("Inventory by color")
@@ -207,7 +206,7 @@ ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05, aes(fill=colo
 
 \newpage 
 ##Inventory distribution by clarity
-The distribution of clarity also looks fairly similar
+The distribution of clarity also looks fairly similar.
 
 ```{r, tidy=TRUE}
 ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05, aes(fill=clarity)) + xlim(c(0,3)) + facet_wrap(~source, scales='free_y') + ggtitle("Inventory by clarity")
@@ -215,13 +214,13 @@ ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05, aes(fill=clar
 
 \newpage
 ##Inventory distribution by cut
-When comparing by cut, I realize that there is a significant difference between both retailers. It seems like almost all diamonds at BrilliantEarth.com are "Super Ideal". As mentioned previously, the highest quality for cut per GIA is "Ideal". However, in recent years, retailers have started to differentiate themselves by selecting better diamonds within the "Ideal" population and market them as "Super Ideal" premium grade diamonds (e.g. Bluenile introduces its own "Astor Ideal" in 2017). Naturally, "Super Ideal" demands higher price and could be a recent marketing innovation in the industry to generate better margin. BrilliantEarth could be using this as a key differentiation point to compete with a big retailer like BlueNile.com
+When comparing by cut, I realize that there is a significant difference between both retailers. Almost all diamonds at brilliantearth.com are "Super Ideal". As mentioned previously, the highest quality for cut per GIA is "Ideal". However, in recent years, retailers have started to differentiate themselves by selecting better diamonds within the "Ideal" population and marketing them as "Super Ideal" premium grade diamonds (e.g. Bluenile introduces its own "Astor Ideal" in 2017). Naturally, "Super Ideal" demands higher price and generates better margin. Brilliantearth.com could be using this as a key differentiation point to compete with a big retailer like bluenile.com.
 
 ```{r, tidy=TRUE}
 ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05, aes(fill=cut)) + xlim(c(0,3)) + facet_wrap(~source, scales='free_y') + ggtitle("Inventory by cut")
 ```
 
-The difference can be highlighted by plotting the bar chart as 100% stacked
+The difference can be highlighted by plotting a 100% stacked chart.
 
 ```{r, tidy=TRUE}
 ggplot(combineDiamond, aes(x=carat))+geom_histogram(binwidth=0.05, aes(fill=cut),position="fill") + xlim(c(0,3)) + facet_wrap(~source, scales='free_y') + ggtitle("Inventory by cut")
@@ -236,7 +235,7 @@ combineDiamond %>%
 
 \newpage
 ##Comparing price distribution
-The next step is to see whether BrilliantEarth.com prices its diamond higher than BlueNile.com. In order to do this, I created a scatter plot. Interestingly, BrilliantEarth.com's price is very competitive. In fact, it almost never price higher than BlueNile for the same carat. From the initial look, you could get "Super Ideal" cut from BrilliantEarth.com for the price of "Ideal" cut from BlueNile.com, which makes BrilliantEarth sounds more value for money. However, we will need to dig deeper by looking at different combination of 4Cs. 
+The next step is to see whether brilliantearth.com prices its diamond higher than bluenile.com. Interestingly, brilliantearth.com's price is very competitive. In fact, it almost never prices higher than bluenile for the same carat. From the initial look, you could get "Super Ideal" cut from brilliantearth.com for the price of "Ideal" cut from bluenile.com, which makes brilliantearth.com sounds more value for money. However, we will need to dig deeper by looking at different combination of 4Cs. 
 
 ```{r, tidy=TRUE}
 ggplot(combineDiamond, aes(x = carat, y = price)) + geom_point(aes(
@@ -246,7 +245,7 @@ ggplot(combineDiamond, aes(x = carat, y = price)) + geom_point(aes(
 ```
 
 \newpage
-In order to do that, I decided to create a box plot and limit the data to cut = "Super Ideal" and "Ideal". Then I look into 4 different scenario at carat = 0.5, 1.0, 1.5, 2.0. In this case, we see at for carat between 0.5 to 1.5, BrilliantEarth.com has higher average price than BlueNile.com while BlueNile.com has higher standard deviation. At carat = 2.0, BrilliantEarth.com has lower average price than BlueNile.com.
+In order to do that, I create a box plot and limit the data to cut = "Super Ideal" and "Ideal". Then I look into 4 different scenarios at carat = 0.5, 1.0, 1.5, 2.0. In this case, we see at carats between 0.5 to 1.5, brilliantearth.com has higher average price than bluenile.com while bluenile.com has higher standard deviation. At carat = 2.0, brilliantearth.com has lower average price than bluenile.com.
 
 ```{r, tidy=TRUE}
 combineDiamond %>%
@@ -282,16 +281,17 @@ combineDiamond %>%
 
 \newpage
 ##Regression model
-Next, I perform a t-test to assess whether there is any pricing difference between two retailers. In my regression, I created interation variables between carat and other 4Cs to account for the increasing rarity premium. 
+Next, I perform a t-test to assess whether there is any pricing difference between two retailers. I create interation variables between carat and other 4Cs to account for the increasing rarity premium. I also create interaction variables between carat and retailers to account for the insights gottem from box plots (i.e. as carat increases, the price difference decreases). Ideally, I should create more interaction variables between each of the 4Cs, due to limited data I have, I decided to keep the regression simple. 
 
 Based on the regression, below are the observations:
-- holding all 4Cs constant, BrilliantEarth.com is 6.5% more expensive as compared to BlueNile.com
-- holding all 4Cs constant, a diamond with carat = exact integer, is 4.8% more expensive
-- In this case "Super Ideal" diamonds seems to very similar to "Ideal" after combining the effect of cutIdeal and cutIdeal*carat. This could be driven by the skewed population of "Super Ideal" and BrilliantEarth.com's strategy of pricing "Super Ideal" at "Ideal" price level. We could validate this by rerunning the regression by limiting the population to only BrilliantEarth.com. The result shows that holding other factors constant, the price difference between "Ideal" and "Super Ideal" is only 0.2%
+* holding all 4Cs constant, brilliantearth.com is 2% more expensive as compared to bluenile.com at carat=1, and the difference narrows down as the carat increases
+* holding all 4Cs constant, a diamond with carat = exact integer, is 5% more expensive
+* In this case "Super Ideal" diamonds seems to very similar to "Ideal" after combining the effect of cutIdeal and cutIdeal*carat. This could be driven by the skewed population of "Super Ideal" and brilliantearth.com's strategy of pricing "Super Ideal" at "Ideal" price level. We could validate this by rerunning the regression by limiting the population to only brilliantearth.com. The result shows that holding other factors constant, the price difference between "Ideal" and "Super Ideal" is only 0.2%
+* As I do not have the data for crown angle to calculate the HCA score, I decided not to include depth and table in the regression. Therefore, there could be omitted variable bias within the regression
 
 ```{r, tidy=TRUE}
 regression1 <-
-  lm(formula = I(log10(price)) ~ I(carat ^ (1 / 3)) + carat + cut + color + clarity + carat*cut + carat*clarity + carat*color + source + caratInteger,
+  lm(formula = I(log10(price)) ~ I(carat ^ (1 / 3)) + carat + cut + color + clarity + carat*cut + carat*clarity + carat*color + source + source*carat + caratInteger,
      data = combineDiamond)
 summary(regression1)
 
@@ -314,17 +314,16 @@ regression <-
 summary(regression)
 ```
 
-#Shiny frontend
-As part of the project, I also created a Shiny frontend to visualization the data using a scatter plot. Additionally, I also created an input form that will predict the diamond price using the regression above. The Shiny frontend is saved separately as shiny_diamond.R.
+#Part 4: Conclusion
+Based on the brief analysis above, we observe that both bluenile.com and brilliantearth.com have similar inventory composition by carat as they stock their inventories based on consumer demand. 
 
-```{r, tidy=TRUE}
-#Please refer to shiny_diamond.R
-```
+It seems that brilliantearth.com attempts to differentiate itself as a high quality retailer by carrying a large pool of "Super Ideal" diamonds, and as a result, it is able to charge a premium over bluenile.com for smaller diamonds. The strategy is apparent from brilliantearth.com's shopping experience, which features much higher resolution picture of the diamonds than bluenile.com.
 
+However, it is unclear whether "Super Ideal" is indeed higher quality than "Ideal" diamond or it is just a pure marketing/branding strategy. If there is indeed a clear quality difference, I would expect to see a clear price difference between "Super Ideal" vs "Ideal" similar to the price differences observed in other 4Cs. 
 
-#Conclusion
-Based on the brief analysis above, we observe that both BlueNile.com and BrilliantEarth.com have similar inventory composition by carat as they stock their inventories based on consumer demand. 
+One way to assess this is by using a patented free online tool (tool url: https://www.pricescope.com/tools/hca) to measure the refraction score of the some sample diamonds. By inputting the table, depth and angle, the tool will return a rating of the diamond based on light physics. Using two examples (Ideal: https://www.brilliantearth.com/loose-diamonds/view_detail/5280275/ vs Super Ideal: https://www.brilliantearth.com/loose-diamonds/view_detail/5354580/) from brilliantearth.com, the "Super Ideal" scores below the "Ideal" diamond. As this is just one data point, I can't conclude whether "Super Ideal" diamond is a more of a marketing/branding strategy. It will be interesting if I could analyze the HCA scores for all diamonds.   
 
-It seems that BrilliantEarth.com attempts to differentiate itself as a high quality retailer by carrying a large pool of "Super Ideal" diamonds, and as a result, it is able to charge a premium of 6.5% over BlueNile.com. The strategy is apparent from BrilliantEarth.com's shopping experience, which features much higher resolution picture of the diamonds than BlueNile.com.
-
-However, it is unclear whether "Super Ideal" is indeed higher quality than "Ideal" diamond or it is just a pure marketing/branding strategy. If there is indeed a clear quality difference, I would expect to see a clear price difference between "Super Ideal" vs "Ideal" similar to the price differences observed in other 4Cs. By using a patented free online tool (tool url: https://www.pricescope.com/tools/hca, patent url:https://www.google.com/patents/US7251619) to measure the refraction score of the some sample diamonds (Ideal: https://www.brilliantearth.com/loose-diamonds/view_detail/5280275/ vs Super Ideal: https://www.brilliantearth.com/loose-diamonds/view_detail/5354580/) from BrilliantEarth.com, the "Super Ideal" does not score as well as the "Ideal" diamond. Therefore, I'm leaning towards that "Super Ideal" diamond is a more of a marketing/branding strategy. 
+##How can this analysis be improved further
+* __More data__: As there are many factors within each 4C and high standard deviation in prices, having more model will provide a more accurate regression.
+* __Omitted variable biases__: Omitted variable biases exist in the regression as I did not include all the possible interaction variable and important variables such as table, depth and crown angle. Including them will lead to a more accurate regression.
+* __Machine learning algorithm__: One possible ways is to feed the data into a machine learning algorithm and let it predicts the price. However, with this we may not be able to clearly explain the key drivers of price differences. 
